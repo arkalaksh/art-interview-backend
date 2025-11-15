@@ -5,6 +5,10 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
+let fetch;
+(async () => {
+  fetch = (await import('node-fetch')).default;
+})();
 
 const server = http.createServer(app);
 
@@ -131,7 +135,31 @@ io.on('connection', (socket) => {
     });
   });
 });
+// Add this route anywhere before server.listen()
+app.post('/api/ai-detect', async (req, res) => {
+  const { text, model } = req.body;
+  if (!text || !model) {
+    return res.status(400).json({ error: 'Missing text or model parameter' });
+  }
+  
+  try {
+    const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inputs: text, options: { wait_for_model: true } })
+    });
 
+    if (!response.ok) {
+      const err = await response.json();
+      return res.status(response.status).json(err);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 server.listen(PORT, () => {
   console.log(`🚀 Signaling server running on http://localhost:${PORT}`);
 });
